@@ -196,7 +196,7 @@ public class DeploymentStateTest {
         .setResource(wrapString(Bpmn.convertToString(modelInstance)));
 
     deploymentRecord
-        .workflows()
+        .processs()
         .add()
         .setChecksum(wrapString("checksum"))
         .setBpmnProcessId("process")

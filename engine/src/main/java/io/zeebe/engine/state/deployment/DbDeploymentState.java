@@ -14,12 +14,20 @@ import io.zeebe.db.impl.DbCompositeKey;
 import io.zeebe.db.impl.DbInt;
 import io.zeebe.db.impl.DbLong;
 import io.zeebe.db.impl.DbNil;
+import io.zeebe.engine.Loggers;
 import io.zeebe.engine.state.ZbColumnFamilies;
 import io.zeebe.engine.state.mutable.MutableDeploymentState;
 import io.zeebe.protocol.impl.record.value.deployment.DeploymentRecord;
+import io.zeebe.util.buffer.BufferUtil;
+import org.agrona.DirectBuffer;
 import org.agrona.collections.MutableBoolean;
+import org.agrona.collections.MutableLong;
+import org.agrona.collections.MutableReference;
+import org.slf4j.Logger;
 
 public final class DbDeploymentState implements MutableDeploymentState {
+
+  private static final Logger LOG = Loggers.STREAM_PROCESSING;
 
   private final DbLong deploymentKey;
   private final DbInt partitionKey;
@@ -37,7 +45,7 @@ public final class DbDeploymentState implements MutableDeploymentState {
     deploymentPartitionKey = new DbCompositeKey<>(deploymentKey, partitionKey);
     newPendingDeploymentColumnFamily =
         zeebeDb.createColumnFamily(
-            ZbColumnFamilies.NEW_PENDING_DEPLOYMENT,
+            ZbColumnFamilies.PENDING_DEPLOYMENT,
             transactionContext,
             deploymentPartitionKey,
             DbNil.INSTANCE);
@@ -82,6 +90,35 @@ public final class DbDeploymentState implements MutableDeploymentState {
     deploymentKey.wrapLong(key);
     deploymentRaw.setDeploymentRecord(value);
     deploymentRawColumnFamily.put(deploymentKey, deploymentRaw);
+  }
+
+  @Override
+  public void foreachPendingDeploymentDistribution(
+      final PendingDeploymentVisitor pendingDeploymentVisitor) {
+
+    final MutableReference<DirectBuffer> lastDeployment = new MutableReference<>();
+    final MutableLong lastDeploymentKey = new MutableLong(0);
+    newPendingDeploymentColumnFamily.forEach(
+        (compositeKey, nil) -> {
+          final var deploymentKey = compositeKey.getFirst().getValue();
+          final var partitionId = compositeKey.getSecond().getValue();
+
+          if (lastDeploymentKey.value != deploymentKey) {
+            final var deploymentRaw = deploymentRawColumnFamily.get(compositeKey.getFirst());
+            if (deploymentRaw == null) {
+              LOG.warn(
+                  "Expected to find a deployment with key {} for a pending partition {}, but none found. The state is inconsistent.",
+                  deploymentKey,
+                  partitionId);
+              // we ignore this currently
+              return;
+            }
+            lastDeployment.set(BufferUtil.createCopy(deploymentRaw.getDeploymentRecord()));
+            lastDeploymentKey.set(deploymentKey);
+          }
+
+          pendingDeploymentVisitor.visit(deploymentKey, partitionId, lastDeployment.get());
+        });
   }
 
   @Override

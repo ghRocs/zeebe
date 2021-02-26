@@ -65,16 +65,40 @@ public final class CreateDeploymentMultiplePartitionsTest {
     assertThat(deployment.getRecordType()).isEqualTo(RecordType.EVENT);
     assertThat(deployment.getIntent()).isEqualTo(DeploymentIntent.CREATED);
 
-    final var fullyDistributedDeployment =
+    final var list =
         RecordingExporter.deploymentRecords()
+            .withRecordKey(deployment.getKey())
             .withIntent(DeploymentIntent.FULLY_DISTRIBUTED)
-            .getFirst();
+            .collect(Collectors.toList());
+    assertThat(list).hasSize(1);
 
+    final var fullyDistributedDeployment = list.get(0);
     assertThat(fullyDistributedDeployment.getKey()).isNotNegative();
     assertThat(fullyDistributedDeployment.getPartitionId()).isEqualTo(PARTITION_ID);
     assertThat(fullyDistributedDeployment.getRecordType()).isEqualTo(RecordType.EVENT);
     assertThat(fullyDistributedDeployment.getIntent())
         .isEqualTo(DeploymentIntent.FULLY_DISTRIBUTED);
+
+    assertThat(
+            RecordingExporter.deploymentRecords()
+                .withIntent(DeploymentIntent.DISTRIBUTE)
+                .limit(record -> record.getIntent().equals(DeploymentIntent.FULLY_DISTRIBUTED))
+                .count())
+        .isEqualTo(PARTITION_COUNT - 1);
+
+    assertThat(
+            RecordingExporter.records()
+                .limit(record -> record.getIntent().equals(DeploymentIntent.FULLY_DISTRIBUTED))
+                .withIntent(DeploymentDistributionIntent.DISTRIBUTING)
+                .count())
+        .isEqualTo(PARTITION_COUNT - 1);
+
+    assertThat(
+            RecordingExporter.records()
+                .limit(record -> record.getIntent().equals(DeploymentIntent.FULLY_DISTRIBUTED))
+                .withIntent(DeploymentDistributionIntent.COMPLETE)
+                .count())
+        .isEqualTo(PARTITION_COUNT - 1);
 
     //    todo(zell): https://github.com/zeebe-io/zeebe/issues/6314 fully distributed contains
     //    currently no longer any resources

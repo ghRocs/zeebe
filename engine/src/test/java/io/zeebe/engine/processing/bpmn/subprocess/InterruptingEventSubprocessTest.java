@@ -21,12 +21,12 @@ import io.zeebe.protocol.record.Assertions;
 import io.zeebe.protocol.record.Record;
 import io.zeebe.protocol.record.intent.JobIntent;
 import io.zeebe.protocol.record.intent.MessageSubscriptionIntent;
-import io.zeebe.protocol.record.intent.TimerIntent;
 import io.zeebe.protocol.record.intent.ProcessInstanceIntent;
+import io.zeebe.protocol.record.intent.TimerIntent;
 import io.zeebe.protocol.record.value.BpmnElementType;
 import io.zeebe.protocol.record.value.JobBatchRecordValue;
-import io.zeebe.protocol.record.value.VariableDocumentUpdateSemantic;
 import io.zeebe.protocol.record.value.ProcessInstanceRecordValue;
+import io.zeebe.protocol.record.value.VariableDocumentUpdateSemantic;
 import io.zeebe.protocol.record.value.deployment.DeployedProcess;
 import io.zeebe.test.util.BrokerClassRuleHelper;
 import io.zeebe.test.util.record.RecordingExporter;
@@ -397,13 +397,7 @@ public class InterruptingEventSubprocessTest {
 
   private long createInstanceAndWaitForTask(final BpmnModelInstance model) {
     currentProcess =
-        ENGINE
-            .deployment()
-            .withXmlResource(model)
-            .deploy()
-            .getValue()
-            .getDeployedProcesss()
-            .get(0);
+        ENGINE.deployment().withXmlResource(model).deploy().getValue().getDeployedProcesss().get(0);
 
     final long wfInstanceKey =
         ENGINE
